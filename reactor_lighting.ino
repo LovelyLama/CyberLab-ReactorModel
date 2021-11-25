@@ -23,8 +23,6 @@
 // Pins usage
 #define LED_TOP 5
 #define LED_BOTTOM 6
-#define RCT_ON 3
-#define RCT_ERR 4
 
 // Constant
 #define NUM_LED_TOP 24
@@ -62,7 +60,10 @@ States state;
 bool inTransition = false;
 bool runOnce = false; // it is not necessary to refresh leds if nothing changed,
 
-uint32_t _timeStart = 0;
+unsigned long currentTime = millis();
+unsigned long startTime = startTime;
+unsigned long elapsedTime;
+long waitTime = 1234;
 
 void setup() {
   //  Serial.begin(115200);
@@ -80,15 +81,13 @@ void setup() {
   // blink for startup
   startup();
 
-  state = standby;
+  state = on;
 
   ringTopFade.begin();
   ringBottomFade.begin();
   ringTopPulse.begin();
   ringBottomTwinkle.begin(ringBottom);
 
-  pinMode(RCT_ON, INPUT);
-  pinMode(RCT_ERR, INPUT);
 }
 
 void loop() {
@@ -103,7 +102,6 @@ void loop() {
     case on:
       onState();
       if (!inTransition) {
-        if (to_standby()) state = standby;
         if (to_error()) state = error;
       }
       break;
@@ -111,7 +109,6 @@ void loop() {
       errorState();
       if (!inTransition) {
         if (to_on()) state = on;
-        if (to_standby()) state = standby;
       }
       break;
   }
@@ -121,7 +118,7 @@ void loop() {
 // ---------------- CONDITIONS FOR STATE TRANSITION ---------------
 //
 bool to_on() {
-  if (!digitalRead(RCT_ON) && digitalRead(RCT_ERR)) {
+  if (time_to_switch()) {
     ringTopFade.setFade(ringTop.getPixelColor(0), whiteColor);
     ringBottomFade.setFade(ringBottom.getPixelColor(0), blueColor);
     runOnce = false;
@@ -130,18 +127,8 @@ bool to_on() {
   return false;
 }
 
-bool to_standby() {
-  if (digitalRead(RCT_ON) && digitalRead(RCT_ERR)) {
-    ringTopFade.setFade(ringTop.getPixelColor(0), greenColor);
-    ringBottomFade.setFade(ringBottom.getPixelColor(0), greenColor);
-    runOnce = false;
-    return true;
-  }
-  return false;
-}
-
 bool to_error() {
-  if (!digitalRead(RCT_ON) && !digitalRead(RCT_ERR)) {
+  if (time_to_switch()) {
     ringTopFade.setFade(ringTop.getPixelColor(0), blackColor);
     ringBottomFade.setFade(ringBottom.getPixelColor(0), blackColor);
     ringTopPulse.reset();
@@ -245,6 +232,19 @@ inline void startup() {
   ringTop.show();
   ringBottom.show();
   delay(250);
+}
+
+bool time_to_switch() {
+
+  currentTime = millis();
+  elapsedTime = currentTime - startTime;
+
+ if(elapsedTime > waitTime)
+      waitTime = random(10, 20) * 1234;
+      startTime = currentTime;
+      return true;
+    }
+  return false;
 }
 
 //inline void print_color (uint32_t color) {
